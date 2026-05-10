@@ -136,6 +136,35 @@ func errorsAs(err error, target any) bool {
 	return false
 }
 
+func TestRender_Basic(t *testing.T) {
+	ctx := context.Background()
+	r, err := New(ctx, WithPoolSize(1), WithInterpreter())
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer func() { _ = r.Close() }()
+
+	pdf, err := r.Render(ctx, []byte("<p>hello fulgur</p>"), nil)
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	if !bytesHasPrefix(pdf, []byte("%PDF-")) {
+		t.Fatalf("missing %%PDF- prefix; got %q", pdf[:8])
+	}
+}
+
+func bytesHasPrefix(b, prefix []byte) bool {
+	if len(b) < len(prefix) {
+		return false
+	}
+	for i := range prefix {
+		if b[i] != prefix[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func TestOptions_MarshalNamedPageSize(t *testing.T) {
 	ps := PageSize{Name: "A4"}
 	got, err := json.Marshal(Options{PageSize: &ps})
