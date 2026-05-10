@@ -6,6 +6,7 @@
 
 mod error;
 mod memory;
+mod options;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn fulgur_wasi_abi_version() -> u32 {
