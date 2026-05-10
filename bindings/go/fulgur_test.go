@@ -222,6 +222,28 @@ func TestRender_BadOptionsReturnsTypedError(t *testing.T) {
 	}
 }
 
+// TestRender_AutoBackendFallback verifies that on platforms where the
+// default JIT panics on this wasm module (darwin/arm64 today), New()
+// silently falls back to the interpreter and the render still succeeds.
+// On platforms where the JIT works (linux/amd64) it just exercises the
+// JIT path.
+func TestRender_AutoBackendFallback(t *testing.T) {
+	ctx := context.Background()
+	r, err := New(ctx, WithPoolSize(1)) // NO backend option — auto
+	if err != nil {
+		t.Fatalf("New (auto): %v", err)
+	}
+	defer func() { _ = r.Close() }()
+
+	pdf, err := r.Render(ctx, []byte("<p>auto</p>"), nil)
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	if !bytesHasPrefix(pdf, []byte("%PDF-")) {
+		t.Fatal("missing %PDF- prefix")
+	}
+}
+
 func TestRender_WithCustomCSS(t *testing.T) {
 	ctx := context.Background()
 	r, err := New(ctx,

@@ -42,6 +42,10 @@ func main() {
 }
 ```
 
+That's the whole API. `New` automatically picks a wazero backend that
+works on the current host (see [Backend selection](#backend-selection-jit-vs-interpreter)
+below for details).
+
 ## Pool sizing
 
 `fulgur.New` builds a pool of WASM module instances; each instance can
@@ -91,17 +95,24 @@ Identical inputs and identical registered assets produce byte-identical
 PDFs. The bundled font means you don't depend on host fonts (unlike the
 fulgur CLI's default behaviour).
 
-## darwin/arm64 note
+## Backend selection (JIT vs interpreter)
 
-wazero's wazevo arm64 JIT compiler currently panics on the fulgur.wasm
-module (a `resolveAddressingMode` bug in wazevo). On darwin/arm64 you
-must pass `fulgur.WithInterpreter()` to fall back to the interpreter
-backend:
+`fulgur.New(ctx)` automatically tries wazero's optimizing JIT first and
+silently falls back to the universal interpreter if the JIT panics
+(wazero's wazevo arm64 backend has a `resolveAddressingMode` bug that
+trips on the fulgur.wasm module today). The same call works on
+linux/amd64 (fast JIT path) and darwin/arm64 (interpreter fallback) —
+no platform-specific code on your end.
+
+If you'd rather control the backend explicitly:
 
 ```go
-r, _ := fulgur.New(ctx, fulgur.WithInterpreter())
+r, _ := fulgur.New(ctx, fulgur.WithInterpreter()) // skip the JIT probe
+r, _ := fulgur.New(ctx, fulgur.WithJIT())         // hard-fail if JIT panics
 ```
 
-The interpreter is universally supported and runs fast enough for most
-workloads (single render in well under a second), but Linux x86_64
-production callers can leave the option off for full JIT performance.
+The auto path adds a one-time ~5 second probe cost on platforms where
+the JIT is broken (caught panic + retry). On platforms where the JIT
+works, there's no overhead. Either way, subsequent renders are at
+backend-native speed. Pass `WithInterpreter()` on known-broken hosts
+(currently darwin/arm64, likely linux/arm64) to skip the probe.

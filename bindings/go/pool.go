@@ -13,12 +13,26 @@ import (
 
 // rendererConfig collects construction-time options.
 type rendererConfig struct {
-	poolSize    int
-	fonts       [][]byte
-	css         []Asset
-	images      []Asset
-	interpreter bool
+	poolSize int
+	fonts    [][]byte
+	css      []Asset
+	images   []Asset
+	backend  backendChoice
 }
+
+type backendChoice uint8
+
+const (
+	// backendAuto tries the JIT first and falls back to the interpreter
+	// on a wazero runtime panic (e.g. wazevo arm64
+	// `resolveAddressingMode` bug). Default.
+	backendAuto backendChoice = iota
+	// backendJIT forces the optimizing JIT backend; surfaces any panic
+	// to the caller as an error from New.
+	backendJIT
+	// backendInterpreter forces the universally-supported interpreter.
+	backendInterpreter
+)
 
 // RendererOption configures a Renderer at construction time.
 type RendererOption func(*rendererConfig)
@@ -50,13 +64,22 @@ func WithImages(assets ...Asset) RendererOption {
 	return func(c *rendererConfig) { c.images = append(c.images, assets...) }
 }
 
-// WithInterpreter forces wazero's interpreter backend instead of the
-// default (optimizing) JIT. Required on darwin/arm64 today: wazero's
-// wazevo arm64 compiler panics on the fulgur.wasm module
-// (resolveAddressingMode bug). Production callers on Linux x86_64 can
-// leave this off for full JIT performance.
+// WithInterpreter forces wazero's interpreter backend. Useful for
+// reproducible behavior across platforms or to skip the JIT probe on
+// arm64 hosts where wazevo is known to panic on this wasm module.
+//
+// By default New() probes the JIT first and falls back to the
+// interpreter automatically — most callers don't need this option.
 func WithInterpreter() RendererOption {
-	return func(c *rendererConfig) { c.interpreter = true }
+	return func(c *rendererConfig) { c.backend = backendInterpreter }
+}
+
+// WithJIT forces wazero's optimizing JIT backend with no interpreter
+// fallback. If the JIT panics during instantiation (e.g. wazevo arm64
+// `resolveAddressingMode` bug), New returns an error. Use this when
+// you'd rather hard-fail than silently degrade to the interpreter.
+func WithJIT() RendererOption {
+	return func(c *rendererConfig) { c.backend = backendJIT }
 }
 
 // Asset is a named binary blob (CSS or image).
@@ -81,6 +104,12 @@ type Renderer struct {
 
 // New compiles the embedded WASM module and starts the instance pool.
 // The returned Renderer must be Closed when done.
+//
+// By default the optimizing JIT is tried first, and on a wazero runtime
+// panic the construction is silently retried with the interpreter — so
+// the same call works on Linux x86_64 (fast JIT) and darwin/arm64
+// (interpreter fallback) without any platform-specific code. Use
+// WithInterpreter / WithJIT to force a backend explicitly.
 func New(ctx context.Context, opts ...RendererOption) (*Renderer, error) {
 	cfg := rendererConfig{poolSize: runtime.GOMAXPROCS(0)}
 	for _, o := range opts {
@@ -90,8 +119,43 @@ func New(ctx context.Context, opts ...RendererOption) (*Renderer, error) {
 		cfg.poolSize = 1
 	}
 
+	switch cfg.backend {
+	case backendInterpreter:
+		return newWithBackend(ctx, cfg, true)
+	case backendJIT:
+		return newWithBackend(ctx, cfg, false)
+	default: // backendAuto
+		r, err := tryNewJIT(ctx, cfg)
+		if err == nil {
+			return r, nil
+		}
+		// JIT failed (panic or compile error). Fall back to interpreter.
+		return newWithBackend(ctx, cfg, true)
+	}
+}
+
+// tryNewJIT runs newWithBackend with the JIT and converts any wazero
+// runtime panic into an error so the caller can fall back to the
+// interpreter. Common trigger: wazevo arm64 `resolveAddressingMode`.
+func tryNewJIT(ctx context.Context, cfg rendererConfig) (r *Renderer, err error) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			if r != nil {
+				_ = r.Close()
+				r = nil
+			}
+			err = fmt.Errorf("wazero JIT panic: %v", rec)
+		}
+	}()
+	return newWithBackend(ctx, cfg, false)
+}
+
+// newWithBackend constructs the runtime, compiles the module, and fills
+// the instance pool. interpreter=true selects the universal interpreter
+// runtime; false selects wazero's default (optimizing JIT) runtime.
+func newWithBackend(ctx context.Context, cfg rendererConfig, interpreter bool) (*Renderer, error) {
 	var rt wazero.Runtime
-	if cfg.interpreter {
+	if interpreter {
 		rt = wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfigInterpreter())
 	} else {
 		rt = wazero.NewRuntime(ctx)
