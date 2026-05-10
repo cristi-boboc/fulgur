@@ -4,6 +4,8 @@
 //! `extern "C"` ABI. Browser bindings (wasm-bindgen) live in
 //! `crates/fulgur-wasm`.
 
+mod memory;
+
 #[unsafe(no_mangle)]
 pub extern "C" fn fulgur_wasi_abi_version() -> u32 {
     1
