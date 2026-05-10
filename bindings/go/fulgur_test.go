@@ -70,3 +70,76 @@ func TestMemory_RoundtripBytes(t *testing.T) {
 		t.Fatalf("free: %v", err)
 	}
 }
+
+func TestErrors_FetchLastErrorAfterBadConfigure(t *testing.T) {
+	ctx := context.Background()
+	r := newTestRuntime(ctx)
+	defer r.Close(ctx)
+	wasi_snapshot_preview1.MustInstantiate(ctx, r)
+	mod, err := r.Instantiate(ctx, wasmBytes)
+	if err != nil {
+		t.Fatalf("instantiate: %v", err)
+	}
+
+	res, err := mod.ExportedFunction("fulgur_engine_new").Call(ctx)
+	if err != nil {
+		t.Fatalf("engine_new: %v", err)
+	}
+	handle := uint32(res[0])
+	if handle == 0 {
+		t.Fatal("engine_new returned 0")
+	}
+
+	json := []byte(`{"unknownField":1}`)
+	ptr, n, err := writeBytes(ctx, mod, json)
+	if err != nil {
+		t.Fatalf("writeBytes: %v", err)
+	}
+	defer func() { _ = free(ctx, mod, ptr, n) }()
+
+	res, err = mod.ExportedFunction("fulgur_engine_configure").Call(
+		ctx, uint64(handle), uint64(ptr), uint64(n),
+	)
+	if err != nil {
+		t.Fatalf("configure: %v", err)
+	}
+	rc := int32(res[0])
+	if rc != -1 {
+		t.Fatalf("configure rc = %d, want -1", rc)
+	}
+
+	gotErr := fetchLastError(ctx, mod, "configure")
+	var fe *Error
+	if !errorsAs(gotErr, &fe) {
+		t.Fatalf("want *fulgur.Error, got %T (%v)", gotErr, gotErr)
+	}
+	if !contains(fe.Message, "unknown field") {
+		t.Fatalf("want 'unknown field' in message, got %q", fe.Message)
+	}
+}
+
+// errorsAs is a tiny helper to extract our typed *Error from an error
+// chain without importing the stdlib `errors` package (which would
+// shadow the local errors.go file).
+func errorsAs(err error, target any) bool {
+	type asErr interface{ As(any) bool }
+	if x, ok := err.(asErr); ok {
+		return x.As(target)
+	}
+	if pe, ok := err.(*Error); ok {
+		if pp, ok := target.(**Error); ok {
+			*pp = pe
+			return true
+		}
+	}
+	return false
+}
+
+func contains(s, sub string) bool {
+	for i := 0; i+len(sub) <= len(s); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
+	}
+	return false
+}
