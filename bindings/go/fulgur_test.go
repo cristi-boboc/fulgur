@@ -3,6 +3,8 @@ package fulgur
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
@@ -163,6 +165,84 @@ func bytesHasPrefix(b, prefix []byte) bool {
 		}
 	}
 	return true
+}
+
+func TestRender_ConcurrentAcrossPool(t *testing.T) {
+	ctx := context.Background()
+	r, err := New(ctx, WithPoolSize(4), WithInterpreter())
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer func() { _ = r.Close() }()
+
+	const n = 16
+	var wg sync.WaitGroup
+	errs := make(chan error, n)
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			html := []byte("<p>doc " + itoa(i) + "</p>")
+			pdf, err := r.Render(ctx, html, nil)
+			if err != nil {
+				errs <- err
+				return
+			}
+			if !bytesHasPrefix(pdf, []byte("%PDF-")) {
+				errs <- fmt.Errorf("doc %d: missing PDF prefix", i)
+			}
+		}(i)
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Error(err)
+	}
+}
+
+func TestRender_BadOptionsReturnsTypedError(t *testing.T) {
+	ctx := context.Background()
+	r, err := New(ctx, WithPoolSize(1), WithInterpreter())
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer func() { _ = r.Close() }()
+
+	bad := &Options{PageSize: &PageSize{Name: "Tabloid"}}
+	_, err = r.Render(ctx, []byte("<p>x</p>"), bad)
+	if err == nil {
+		t.Fatal("want error, got nil")
+	}
+	var fe *Error
+	if !errorsAs(err, &fe) {
+		t.Fatalf("want *fulgur.Error, got %T (%v)", err, err)
+	}
+	if !contains(fe.Message, "unknown page size") {
+		t.Fatalf("want 'unknown page size' in message, got %q", fe.Message)
+	}
+}
+
+// itoa avoids importing strconv in tests.
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	neg := n < 0
+	if neg {
+		n = -n
+	}
+	var buf [20]byte
+	i := len(buf)
+	for n > 0 {
+		i--
+		buf[i] = byte('0' + n%10)
+		n /= 10
+	}
+	if neg {
+		i--
+		buf[i] = '-'
+	}
+	return string(buf[i:])
 }
 
 func TestOptions_MarshalNamedPageSize(t *testing.T) {
