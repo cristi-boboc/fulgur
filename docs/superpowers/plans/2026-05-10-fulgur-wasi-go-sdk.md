@@ -87,7 +87,7 @@ slab = "0.4"
 //! `extern "C"` ABI. Browser bindings (wasm-bindgen) live in
 //! `crates/fulgur-wasm`.
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn fulgur_wasi_abi_version() -> u32 {
     1
 }
@@ -175,7 +175,7 @@ git commit -m "feat(fulgur): add wasm32-wasip1 getrandom backend"
 //! reconstruct + drop on free. Length must match the original allocation
 //! exactly — deallocating a different length is undefined behaviour.
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn fulgur_alloc(len: u32) -> u32 {
     let mut v: Vec<u8> = Vec::with_capacity(len as usize);
     let ptr = v.as_mut_ptr() as u32;
@@ -186,7 +186,7 @@ pub extern "C" fn fulgur_alloc(len: u32) -> u32 {
 /// # Safety
 /// `ptr` must come from a previous `fulgur_alloc(len)` and not have been
 /// freed already.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn fulgur_free(ptr: u32, len: u32) {
     if ptr == 0 {
         return;
@@ -269,7 +269,7 @@ Replace the placeholder `lib.rs` content with:
 
 mod memory;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn fulgur_wasi_abi_version() -> u32 {
     1
 }
@@ -324,7 +324,7 @@ pub(crate) fn with<R>(f: impl FnOnce(&str) -> R) -> R {
 }
 
 /// Length of the current last-error message in bytes.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn fulgur_last_error_len() -> u32 {
     with(|s| s.len() as u32)
 }
@@ -334,7 +334,7 @@ pub extern "C" fn fulgur_last_error_len() -> u32 {
 ///
 /// # Safety
 /// `dst_ptr` must point to at least `dst_len` writable bytes.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn fulgur_last_error_copy(dst_ptr: u32, dst_len: u32) -> u32 {
     with(|s| {
         let n = std::cmp::min(s.len(), dst_len as usize);
@@ -380,7 +380,7 @@ mod tests {
 mod error;
 mod memory;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn fulgur_wasi_abi_version() -> u32 {
     1
 }
@@ -971,12 +971,12 @@ use crate::engine::{EngineState, apply_options};
 use crate::options::EngineOptions;
 
 /// ABI version. Bump on any breaking change to the export surface.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn fulgur_wasi_abi_version() -> u32 {
     1
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn fulgur_engine_new() -> u32 {
     error::clear();
     match engine::new_with_default_font() {
@@ -988,7 +988,7 @@ pub extern "C" fn fulgur_engine_new() -> u32 {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn fulgur_engine_free(handle: u32) {
     engine::remove(handle);
 }
@@ -998,7 +998,7 @@ pub extern "C" fn fulgur_engine_free(handle: u32) {
 /// # Safety
 /// `json_ptr` must point to `json_len` valid UTF-8 bytes inside this
 /// module's linear memory.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn fulgur_engine_configure(
     handle: u32,
     json_ptr: u32,
@@ -1031,7 +1031,7 @@ pub unsafe extern "C" fn fulgur_engine_configure(
 ///
 /// # Safety
 /// `(ptr, len)` must reference `len` valid bytes in this module's memory.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn fulgur_engine_add_font(handle: u32, ptr: u32, len: u32) -> i32 {
     error::clear();
     let bytes = unsafe { memory::slice_from_raw(ptr, len) }.to_vec();
@@ -1057,7 +1057,7 @@ pub unsafe extern "C" fn fulgur_engine_add_font(handle: u32, ptr: u32, len: u32)
 ///
 /// # Safety
 /// All pointer/length pairs must reference valid bytes in this module's memory.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn fulgur_engine_add_css(
     handle: u32,
     _name_ptr: u32,
@@ -1086,7 +1086,7 @@ pub unsafe extern "C" fn fulgur_engine_add_css(
 ///
 /// # Safety
 /// All pointer/length pairs must reference valid bytes in this module's memory.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn fulgur_engine_add_image(
     handle: u32,
     name_ptr: u32,
@@ -1118,7 +1118,7 @@ pub unsafe extern "C" fn fulgur_engine_add_image(
 ///
 /// # Safety
 /// `(html_ptr, html_len)` must reference valid UTF-8 bytes in this module's memory.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn fulgur_engine_render(handle: u32, html_ptr: u32, html_len: u32) -> u64 {
     error::clear();
     let html = match std::str::from_utf8(unsafe { memory::slice_from_raw(html_ptr, html_len) }) {
