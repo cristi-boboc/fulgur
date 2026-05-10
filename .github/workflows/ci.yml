@@ -337,3 +337,51 @@ jobs:
         run: cargo clippy -p pyfulgur --features extension-module --all-targets -- -D warnings
       - name: cargo clippy fulgur-ruby (ruby-api)
         run: cargo clippy -p fulgur-ruby --features ruby-api --all-targets -- -D warnings
+
+  wasi-build:
+    name: WASI build (drift check)
+    runs-on: ubuntu-latest
+    # Rebuilds crates/fulgur-wasi for wasm32-wasip1 and verifies the
+    # committed bindings/go/internal/wasm/fulgur.wasm matches. Drift
+    # means the artifact is stale — re-run `mise run build-wasi` and
+    # commit the result.
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ubuntu-latest-fulgur-wasi
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Install binaryen (wasm-opt)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binaryen
+      - name: Build wasm artifact
+        run: |
+          cargo build -p fulgur-wasi --release --target wasm32-wasip1
+          mkdir -p /tmp/wasm-out
+          wasm-opt -Oz -o /tmp/wasm-out/fulgur.wasm \
+            target/wasm32-wasip1/release/fulgur_wasi.wasm
+      - name: Verify committed artifact matches build
+        run: |
+          if ! cmp -s /tmp/wasm-out/fulgur.wasm bindings/go/internal/wasm/fulgur.wasm; then
+            echo "::error::bindings/go/internal/wasm/fulgur.wasm is out of date."
+            echo "Re-run 'mise run build-wasi' and commit the result."
+            exit 1
+          fi
+          ls -lh bindings/go/internal/wasm/fulgur.wasm
+
+  go-test:
+    name: Go SDK tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache-dependency-path: bindings/go/go.sum
+      - name: go test (race)
+        working-directory: bindings/go
+        run: go test -race -v ./...
