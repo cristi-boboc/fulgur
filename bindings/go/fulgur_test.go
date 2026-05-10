@@ -2,6 +2,7 @@ package fulgur
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/tetratelabs/wazero"
@@ -133,6 +134,39 @@ func errorsAs(err error, target any) bool {
 		}
 	}
 	return false
+}
+
+func TestOptions_MarshalNamedPageSize(t *testing.T) {
+	ps := PageSize{Name: "A4"}
+	got, err := json.Marshal(Options{PageSize: &ps})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if string(got) != `{"pageSize":"A4"}` {
+		t.Fatalf("got %s", got)
+	}
+}
+
+func TestOptions_MarshalCustomPageSize(t *testing.T) {
+	ps := PageSize{WidthMM: 100, HeightMM: 150}
+	got, err := json.Marshal(Options{PageSize: &ps})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if string(got) != `{"pageSize":{"widthMm":100,"heightMm":150}}` {
+		t.Fatalf("got %s", got)
+	}
+}
+
+func TestOptions_MarshalMarginPt(t *testing.T) {
+	pt := float32(36)
+	got, err := json.Marshal(Options{Margin: &Margin{UniformPT: &pt}})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if string(got) != `{"margin":{"pt":36}}` {
+		t.Fatalf("got %s", got)
+	}
 }
 
 func contains(s, sub string) bool {
