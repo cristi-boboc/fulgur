@@ -119,6 +119,47 @@ pub(crate) fn apply_options(state: &mut EngineState, opts: EngineOptions) -> Res
     Ok(())
 }
 
+pub(crate) fn render(state: &EngineState, html: &str) -> fulgur::Result<Vec<u8>> {
+    let mut builder = fulgur::Engine::builder().assets(state.assets.clone());
+    if let Some(s) = state.page_size {
+        builder = builder.page_size(s);
+    }
+    if let Some(m) = state.margin {
+        builder = builder.margin(m);
+    }
+    if let Some(l) = state.landscape {
+        builder = builder.landscape(l);
+    }
+    if let Some(ref t) = state.title {
+        builder = builder.title(t.clone());
+    }
+    if !state.authors.is_empty() {
+        builder = builder.authors(state.authors.clone());
+    }
+    if let Some(ref d) = state.description {
+        builder = builder.description(d.clone());
+    }
+    if !state.keywords.is_empty() {
+        builder = builder.keywords(state.keywords.clone());
+    }
+    if let Some(ref c) = state.creator {
+        builder = builder.creator(c.clone());
+    }
+    if let Some(ref p) = state.producer {
+        builder = builder.producer(p.clone());
+    }
+    if let Some(ref cd) = state.creation_date {
+        builder = builder.creation_date(cd.clone());
+    }
+    if let Some(ref l) = state.lang {
+        builder = builder.lang(l.clone());
+    }
+    if let Some(b) = state.bookmarks {
+        builder = builder.bookmarks(b);
+    }
+    builder.build().render_html(html)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -157,6 +198,14 @@ mod tests {
         let (title, landscape) = with(h, |s| (s.title.clone(), s.landscape)).unwrap();
         assert_eq!(title.as_deref(), Some("kept"));
         assert_eq!(landscape, Some(true));
+        remove(h);
+    }
+
+    #[test]
+    fn render_emits_pdf_magic() {
+        let h = insert(EngineState::default());
+        let pdf = with(h, |s| render(s, "<p>hello</p>")).unwrap().unwrap();
+        assert!(pdf.starts_with(b"%PDF-"), "missing %PDF- prefix");
         remove(h);
     }
 }
