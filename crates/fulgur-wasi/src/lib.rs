@@ -4,6 +4,7 @@
 //! `extern "C"` ABI. Browser bindings (wasm-bindgen) live in
 //! `crates/fulgur-wasm`.
 
+mod error;
 mod memory;
 
 #[unsafe(no_mangle)]
