@@ -6,7 +6,7 @@
 
 **Architecture:** New sibling Rust crate (cdylib, `extern "C"` exports over linear memory, no wasm-bindgen). New Go module that loads the embedded `.wasm` via wazero, manages a fixed-size pool of WASM instances, and marshals options as JSON through the same `EngineOptions` shape used by the existing browser bindings.
 
-**Tech Stack:** Rust 2024 + `serde` + `serde_json` + `slab`, target `wasm32-wasip1` with `getrandom = { features = ["wasi"] }`. Go ≥ 1.23 + `github.com/tetratelabs/wazero`. Build pipeline uses `wasm-opt -Oz` from binaryen.
+**Tech Stack:** Rust 2024 + `serde` + `serde_json` + `slab`, target `wasm32-wasip1` (getrandom 0.4 auto-selects the WASI backend). Go ≥ 1.23 + `github.com/tetratelabs/wazero`. Build pipeline uses `wasm-opt -Oz` from binaryen.
 
 **Spec:** `docs/superpowers/specs/2026-05-10-fulgur-wasi-go-sdk-design.md`
 
@@ -127,10 +127,12 @@ After the existing `[target.'cfg(target_arch = "wasm32")'.dependencies]` block i
 
 ```toml
 # WASI Preview 1 build (wasm32-wasip1): used by `crates/fulgur-wasi` for
-# host-agnostic embedding (wazero, wasmtime). The `wasi` getrandom backend
-# uses `wasi_snapshot_preview1.random_get`. Tracking: fulgur-iym.
+# host-agnostic embedding (wazero, wasmtime). getrandom 0.4 auto-selects
+# its WASI backend (`wasi_snapshot_preview1.random_get`) when targeting
+# wasm32-wasip1; no feature flag is needed (no `wasi` feature exists in
+# 0.4 — only `std`, `sys_rng`, `wasm_js`). Tracking: fulgur-iym.
 [target.wasm32-wasip1.dependencies]
-getrandom = { version = "0.4", default-features = false, features = ["wasi"] }
+getrandom = { version = "0.4", default-features = false }
 ```
 
 - [ ] **Step 2: Install the WASI target locally**
