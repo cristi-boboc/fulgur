@@ -43,3 +43,30 @@ func TestSmoke_LoadsAndCallsAbiVersion(t *testing.T) {
 		t.Fatalf("abi_version = %d, want 1", got)
 	}
 }
+
+func TestMemory_RoundtripBytes(t *testing.T) {
+	ctx := context.Background()
+	r := newTestRuntime(ctx)
+	defer r.Close(ctx)
+	wasi_snapshot_preview1.MustInstantiate(ctx, r)
+	mod, err := r.Instantiate(ctx, wasmBytes)
+	if err != nil {
+		t.Fatalf("instantiate: %v", err)
+	}
+
+	want := []byte("hello, fulgur")
+	ptr, n, err := writeBytes(ctx, mod, want)
+	if err != nil {
+		t.Fatalf("writeBytes: %v", err)
+	}
+	got, err := readBytes(mod, ptr, n)
+	if err != nil {
+		t.Fatalf("readBytes: %v", err)
+	}
+	if string(got) != string(want) {
+		t.Fatalf("round-trip mismatch: got %q, want %q", got, want)
+	}
+	if err := free(ctx, mod, ptr, n); err != nil {
+		t.Fatalf("free: %v", err)
+	}
+}
