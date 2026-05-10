@@ -97,22 +97,23 @@ fulgur CLI's default behaviour).
 
 ## Backend selection (JIT vs interpreter)
 
-`fulgur.New(ctx)` automatically tries wazero's optimizing JIT first and
-silently falls back to the universal interpreter if the JIT panics
-(wazero's wazevo arm64 backend has a `resolveAddressingMode` bug that
-trips on the fulgur.wasm module today). The same call works on
-linux/amd64 (fast JIT path) and darwin/arm64 (interpreter fallback) —
-no platform-specific code on your end.
+`fulgur.New(ctx)` picks the right wazero backend automatically:
 
-If you'd rather control the backend explicitly:
+- **arm64 (any OS)** — uses the interpreter directly. wazero's wazevo
+  arm64 backend has a `resolveAddressingMode` bug that trips on the
+  fulgur.wasm module, so the JIT probe is skipped at construction.
+- **amd64 / other** — tries the optimizing JIT, and if it panics for any
+  unforeseen reason, silently retries with the interpreter as a safety
+  net.
+
+You don't need to do platform detection in your code.
+
+To override:
 
 ```go
-r, _ := fulgur.New(ctx, fulgur.WithInterpreter()) // skip the JIT probe
-r, _ := fulgur.New(ctx, fulgur.WithJIT())         // hard-fail if JIT panics
+r, _ := fulgur.New(ctx, fulgur.WithInterpreter()) // force interpreter
+r, _ := fulgur.New(ctx, fulgur.WithJIT())         // force JIT, error on panic
 ```
 
-The auto path adds a one-time ~5 second probe cost on platforms where
-the JIT is broken (caught panic + retry). On platforms where the JIT
-works, there's no overhead. Either way, subsequent renders are at
-backend-native speed. Pass `WithInterpreter()` on known-broken hosts
-(currently darwin/arm64, likely linux/arm64) to skip the probe.
+`WithJIT()` is for callers who'd rather hard-fail than silently use the
+slower interpreter.

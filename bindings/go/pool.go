@@ -125,11 +125,20 @@ func New(ctx context.Context, opts ...RendererOption) (*Renderer, error) {
 	case backendJIT:
 		return newWithBackend(ctx, cfg, false)
 	default: // backendAuto
+		// Skip the JIT probe on platforms where wazero's wazevo arm64
+		// backend is known to panic on this wasm module (the
+		// `resolveAddressingMode` bug). Saves the ~5s recover-and-retry
+		// cost on every Renderer construction. Affects darwin/arm64,
+		// linux/arm64, and windows/arm64 alike.
+		if runtime.GOARCH == "arm64" {
+			return newWithBackend(ctx, cfg, true)
+		}
 		r, err := tryNewJIT(ctx, cfg)
 		if err == nil {
 			return r, nil
 		}
-		// JIT failed (panic or compile error). Fall back to interpreter.
+		// JIT failed (panic or compile error). Fall back to interpreter
+		// — keeps the safety net for any platform we haven't enumerated.
 		return newWithBackend(ctx, cfg, true)
 	}
 }
