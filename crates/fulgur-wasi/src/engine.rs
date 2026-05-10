@@ -119,6 +119,15 @@ pub(crate) fn apply_options(state: &mut EngineState, opts: EngineOptions) -> Res
     Ok(())
 }
 
+pub(crate) fn new_with_default_font() -> Result<EngineState, String> {
+    let mut state = EngineState::default();
+    state
+        .assets
+        .add_font_bytes(crate::default_font::NOTO_SANS_REGULAR.to_vec())
+        .map_err(|e| format!("default font: {e}"))?;
+    Ok(state)
+}
+
 pub(crate) fn render(state: &EngineState, html: &str) -> fulgur::Result<Vec<u8>> {
     let mut builder = fulgur::Engine::builder().assets(state.assets.clone());
     if let Some(s) = state.page_size {
@@ -207,5 +216,15 @@ mod tests {
         let pdf = with(h, |s| render(s, "<p>hello</p>")).unwrap().unwrap();
         assert!(pdf.starts_with(b"%PDF-"), "missing %PDF- prefix");
         remove(h);
+    }
+
+    #[test]
+    fn default_font_loads_without_error() {
+        // `AssetBundle` does not expose a public font count today, so we
+        // can't assert directly. `add_font_bytes` returning Ok is the
+        // meaningful check: it proves skrifa successfully decoded the
+        // bytes. The render path is exercised end-to-end in
+        // `lib.rs::tests::end_to_end_minimal_render` (Task 9).
+        let _state = super::new_with_default_font().expect("default font loads");
     }
 }
