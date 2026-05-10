@@ -67,3 +67,20 @@ description = "Build static site to website/site/"
 dir = "website"
 depends = ["docs:install"]
 run = "uv run mkdocs build --strict"
+
+[tasks.build-wasi]
+description = "Build the WASI .wasm artifact for the Go SDK"
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+cargo build -p fulgur-wasi --release --target wasm32-wasip1
+mkdir -p bindings/go/internal/wasm
+if command -v wasm-opt >/dev/null 2>&1; then
+  wasm-opt -Oz -o bindings/go/internal/wasm/fulgur.wasm \\
+    target/wasm32-wasip1/release/fulgur_wasi.wasm
+else
+  echo "wasm-opt not found; copying unoptimized binary" >&2
+  cp target/wasm32-wasip1/release/fulgur_wasi.wasm bindings/go/internal/wasm/fulgur.wasm
+fi
+ls -lh bindings/go/internal/wasm/fulgur.wasm
+"""
