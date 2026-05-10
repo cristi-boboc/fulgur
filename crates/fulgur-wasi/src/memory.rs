@@ -48,9 +48,7 @@ pub(crate) unsafe fn slice_from_raw(ptr: u32, len: u32) -> &'static [u8] {
     if len == 0 {
         return &[];
     }
-    unsafe {
-        std::slice::from_raw_parts(ptr as *const u8, len as usize)
-    }
+    unsafe { std::slice::from_raw_parts(ptr as *const u8, len as usize) }
 }
 
 /// Allocate a `Vec<u8>` of the given content, leak it, and return its

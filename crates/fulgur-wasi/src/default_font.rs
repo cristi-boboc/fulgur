@@ -5,5 +5,4 @@
 //! tiny; license obligations are tracked in `examples/.fonts/OFL.txt`,
 //! which the crate copies here for redistribution.
 
-pub(crate) const NOTO_SANS_REGULAR: &[u8] =
-    include_bytes!("../assets/NotoSans-Regular.ttf");
+pub(crate) const NOTO_SANS_REGULAR: &[u8] = include_bytes!("../assets/NotoSans-Regular.ttf");

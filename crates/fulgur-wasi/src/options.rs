@@ -42,14 +42,21 @@ pub(crate) struct EngineOptions {
 pub(crate) enum PageSizeOption {
     Named(String),
     #[serde(rename_all = "camelCase")]
-    Custom { width_mm: f32, height_mm: f32 },
+    Custom {
+        width_mm: f32,
+        height_mm: f32,
+    },
 }
 
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
 pub(crate) enum MarginOption {
-    Mm { mm: f32 },
-    Pt { pt: f32 },
+    Mm {
+        mm: f32,
+    },
+    Pt {
+        pt: f32,
+    },
     #[serde(rename_all = "camelCase")]
     Full {
         top_mm: f32,
@@ -68,7 +75,10 @@ impl PageSizeOption {
                 "letter" => Ok(PageSize::LETTER),
                 other => Err(format!("unknown page size: {other}")),
             },
-            Self::Custom { width_mm, height_mm } => Ok(PageSize::custom(*width_mm, *height_mm)),
+            Self::Custom {
+                width_mm,
+                height_mm,
+            } => Ok(PageSize::custom(*width_mm, *height_mm)),
         }
     }
 }
@@ -113,7 +123,10 @@ mod tests {
         let opts: EngineOptions =
             serde_json::from_str(r#"{"pageSize":{"widthMm":100.0,"heightMm":150.0}}"#).unwrap();
         match opts.page_size.unwrap() {
-            PageSizeOption::Custom { width_mm, height_mm } => {
+            PageSizeOption::Custom {
+                width_mm,
+                height_mm,
+            } => {
                 assert_eq!(width_mm, 100.0);
                 assert_eq!(height_mm, 150.0);
             }

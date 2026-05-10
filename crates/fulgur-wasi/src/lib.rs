@@ -44,11 +44,7 @@ pub extern "C" fn fulgur_engine_free(handle: u32) {
 /// `json_ptr` must point to `json_len` valid UTF-8 bytes inside this
 /// module's linear memory.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fulgur_engine_configure(
-    handle: u32,
-    json_ptr: u32,
-    json_len: u32,
-) -> i32 {
+pub unsafe extern "C" fn fulgur_engine_configure(handle: u32, json_ptr: u32, json_len: u32) -> i32 {
     error::clear();
     let bytes = unsafe { memory::slice_from_raw(json_ptr, json_len) };
     let opts: EngineOptions = match serde_json::from_slice(bytes) {
@@ -140,14 +136,13 @@ pub unsafe extern "C" fn fulgur_engine_add_image(
     len: u32,
 ) -> i32 {
     error::clear();
-    let name =
-        match std::str::from_utf8(unsafe { memory::slice_from_raw(name_ptr, name_len) }) {
-            Ok(s) => s.to_owned(),
-            Err(e) => {
-                error::set(format!("add_image: invalid name UTF-8: {e}"));
-                return -1;
-            }
-        };
+    let name = match std::str::from_utf8(unsafe { memory::slice_from_raw(name_ptr, name_len) }) {
+        Ok(s) => s.to_owned(),
+        Err(e) => {
+            error::set(format!("add_image: invalid name UTF-8: {e}"));
+            return -1;
+        }
+    };
     let bytes = unsafe { memory::slice_from_raw(ptr, len) }.to_vec();
     match engine::with_mut(handle, |s| s.assets.add_image(name, bytes)) {
         Some(()) => 0,
@@ -166,20 +161,15 @@ pub unsafe extern "C" fn fulgur_engine_add_image(
 /// `(html_ptr, html_len)` must reference valid UTF-8 bytes in this
 /// module's linear memory.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fulgur_engine_render(
-    handle: u32,
-    html_ptr: u32,
-    html_len: u32,
-) -> u64 {
+pub unsafe extern "C" fn fulgur_engine_render(handle: u32, html_ptr: u32, html_len: u32) -> u64 {
     error::clear();
-    let html =
-        match std::str::from_utf8(unsafe { memory::slice_from_raw(html_ptr, html_len) }) {
-            Ok(s) => s,
-            Err(e) => {
-                error::set(format!("render: invalid HTML UTF-8: {e}"));
-                return 0;
-            }
-        };
+    let html = match std::str::from_utf8(unsafe { memory::slice_from_raw(html_ptr, html_len) }) {
+        Ok(s) => s,
+        Err(e) => {
+            error::set(format!("render: invalid HTML UTF-8: {e}"));
+            return 0;
+        }
+    };
     let res = engine::with(handle, |s| engine::render(s, html));
     match res {
         Some(Ok(pdf)) => memory::into_packed(pdf),
@@ -255,10 +245,7 @@ mod tests {
         // ABI function uses — deny_unknown_fields triggers the same error.
         let err =
             serde_json::from_slice::<EngineOptions>(json).expect_err("should reject unknown field");
-        assert!(
-            err.to_string().contains("unknown field"),
-            "got: {err}"
-        );
+        assert!(err.to_string().contains("unknown field"), "got: {err}");
 
         // Set last error manually to test the storage path.
         error::set(format!("invalid options: {err}"));
