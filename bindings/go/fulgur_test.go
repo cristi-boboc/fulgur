@@ -222,6 +222,27 @@ func TestRender_BadOptionsReturnsTypedError(t *testing.T) {
 	}
 }
 
+func TestRender_WithCustomCSS(t *testing.T) {
+	ctx := context.Background()
+	r, err := New(ctx,
+		WithPoolSize(1),
+		WithInterpreter(),
+		WithCSS(Asset{Name: "main.css", Data: []byte("p { color: red; }")}),
+	)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer func() { _ = r.Close() }()
+
+	pdf, err := r.Render(ctx, []byte("<p>red</p>"), nil)
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	if !bytesHasPrefix(pdf, []byte("%PDF-")) {
+		t.Fatal("missing %PDF- prefix")
+	}
+}
+
 // itoa avoids importing strconv in tests.
 func itoa(n int) string {
 	if n == 0 {
