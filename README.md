@@ -232,8 +232,18 @@ PDF bytes
 ```text
 crates/
 ├── fulgur/        # Core library (conversion, layout, rendering)
-└── fulgur-cli/    # CLI tool
+├── fulgur-cli/    # CLI tool
+├── fulgur-wasi/   # WASI WebAssembly cdylib (Go SDK backend)
+├── fulgur-wasm/   # Browser WebAssembly bindings (wasm-bindgen)
+├── pyfulgur/      # Python bindings (PyO3)
+└── fulgur-ruby/   # Ruby bindings (Magnus)
+
+bindings/
+└── go/            # Go SDK over wazero (embeds the fulgur-wasi .wasm)
 ```
+
+See [`bindings/go/README.md`](bindings/go/README.md) for the Go SDK
+quickstart.
 
 ## Development
 
