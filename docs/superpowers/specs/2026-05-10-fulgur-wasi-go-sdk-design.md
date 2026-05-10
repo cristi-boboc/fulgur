@@ -238,11 +238,14 @@ func (r *Renderer) Close() error
   handle, and re-applies per-call `Options` via `engine_configure`.
 - Fonts/CSS/images registered in `New` are added once at instance startup
   and shared across all calls handled by that instance.
-- **Options are sticky on an instance.** A `Render` call with `opts != nil`
-  fully replaces the instance's prior options (the JSON shape is whole-
-  object, not patch). Subsequent calls with `opts == nil` inherit those
-  options. Callers that want per-call isolation must pass `opts` every
-  call. This is documented in the Go README.
+- **Options are sticky on an instance and partial-overriding.** Each field
+  of `EngineOptions` is `Option<T>` on the Rust side; only fields present
+  in the configure JSON override the instance's prior value (mirrors the
+  existing `fulgur-wasm::Engine::apply_options` semantics). Subsequent
+  calls with `opts == nil` inherit prior values. Callers that want a
+  full reset can construct a `Renderer` with a fresh pool, or pass a
+  `Options` value with every field they care about set. This is
+  documented in the Go README.
 - If **any** call during a `Render` (configure, alloc, render, free) fails,
   the instance is **discarded and replaced** (defensive: assume corrupt
   linear memory or leaked state). Pool stays at fixed capacity.
